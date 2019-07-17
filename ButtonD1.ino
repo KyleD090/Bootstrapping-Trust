@@ -1,36 +1,36 @@
-// nrf24_client.pde
-// -*- mode: C++ -*-
-// Example sketch showing how to create a simple messageing client
-// with the RH_NRF24 class. RH_NRF24 class does not provide for addressing or
-// reliability, so you should only use RH_NRF24 if you do not need the higher
-// level messaging abilities.
-// It is designed to work with the other example nrf24_server.
-// Tested on Uno with Sparkfun NRF25L01 module
-// Tested on Anarduino Mini (http://www.anarduino.com/mini/) with RFM73 module
-// Tested on Arduino Mega with Sparkfun WRL-00691 NRF25L01 module
+
 
 #include <SPI.h>
 #include <RH_NRF24.h>
 #include <Hash.h>
-// Singleton instance of the radio driver
+#include <Crypto.h>
+#include <SHA256.h>
+#include <string.h>
+
 RH_NRF24 nrf24;
-
-// RH_NRF24 nrf24(8, 7); // use this to be electrically compatible with Mirf
-// RH_NRF24 nrf24(8, 10);// For Leonardo, need explicit SS pin
-// RH_NRF24 nrf24(8, 7); // For RFM73 on Anarduino Mini
-
-
-
-int ledPin = 4;                // choose the pin for the LED
+int ledPin = 4;                
 int buttonPin = 2; 
 String message; 
-unsigned long StartTime = 0;  
+unsigned long startTime = 0;  
 boolean print = false; 
 char temp[4]; 
+char response[4];
+byte hash[1];
+SHA256 hasher = SHA256(); 
+//long randomNum; 
+unsigned long ElapsedTime = 0000;
+//boolean slow = true; 
+int End = 0; 
+String enemyRandom; 
+String enemyHash; 
+unsigned long ogTime = 0000;  
+long randomNum = random(100, 3000);
+
 void setup() 
 {
+  
   Serial.begin(9600);
-  Serial.println("Begin");
+  Serial.println("I'm D1");
   while (!Serial) 
     ; // wait for serial port to connect. Needed for Leonardo only
   if (!nrf24.init())
@@ -44,16 +44,25 @@ void setup()
 
   pinMode(ledPin, OUTPUT);
   pinMode(buttonPin, INPUT);
+
+  randomSeed(2);
+  randomNum = random(100, 3000);
+  Serial.print("Intial nonce is " );
+  Serial.println(randomNum);
+
+
+
+
+  
 }
 
 
 void loop()
 {
-
   
-  if (nrf24.available())
+    // Look for  message    
+    if (nrf24.available())
   {
-    // Should be a message for us now   
     uint8_t buf[RH_NRF24_MAX_MESSAGE_LEN];
     uint8_t len = sizeof(buf);
     if (nrf24.recv(buf, &len))
@@ -61,27 +70,69 @@ void loop()
 //      NRF24::printBuffer("request: ", buf, len);
       Serial.print("got request: ");
       Serial.println((char*)buf);
-      
+      enemyHash = (char*)buf; 
       // Send a reply
-      uint8_t data[] = "And hello back to you";
+      //Serial.print("Elapsed Time is ");
+      //Serial.println(ElapsedTime);
+      itoa(randomNum, response, 10); 
+      unsigned char t1 = response[0]; 
+      unsigned char t2 = response[1]; 
+      unsigned char t3 = response[2]; 
+      unsigned char t4 = response[3]; 
+      uint8_t data[5] = {t1, t2, t3, t4};
       nrf24.send(data, sizeof(data));
       nrf24.waitPacketSent();
       Serial.println("Sent a reply");
+      Serial.println("");
+      End++; 
+      //Serial.print("End is ");
+      //Serial.println(End);
+      if(End == 2){
+        Serial.print("REACHED END");
+        Serial.print("My Original duration is "); 
+        Serial.println(ogTime);
+        Serial.print("Enemy nonce is "); 
+        Serial.println(enemyRandom);
+        ogTime = ogTime + enemyRandom.toInt();
+        Serial.print("Calculated Elapsed Time is "); 
+        Serial.println(ogTime); 
+        itoa(ogTime, temp, 10);
+        hasher.clear(); 
+        hasher.reset(); 
+        hasher.update(temp, 1); 
+        hasher.finalize(hash, 1);
+        Serial.print("Calculated enemy Hash ");
+        Serial.print("");
+          //String computedHash1 = String(hash[0] + hash[1] + hash[2]+ hash[3]); 
+          String computedHash1 = String(hash[0]);
+          Serial.print(computedHash1);
+        Serial.println("enemy hash is ");
+        Serial.print(enemyHash);
+        if(enemyHash.equals(computedHash1)){
+          Serial.print("AUTHENTICATION PASS"); 
+          }
+        else{
+          Serial.print("AUTHENTICATION FAIL"); 
+          }
+        }
+      //slow = false; 
     }
     else
     {
       Serial.println("recv failed");
     }
-  }
+    }
+  
 
 
   
-
-if(digitalRead(buttonPin) == HIGH){
+ //This code is triggered if a button is pressed 
+  if(digitalRead(buttonPin) == HIGH){
+  
     digitalWrite(ledPin, HIGH);
     print = true; 
-    if(StartTime == 0){
-    StartTime = millis();
+    if(startTime == 0){
+    startTime = millis();
     }
   }
   else{
@@ -89,51 +140,116 @@ if(digitalRead(buttonPin) == HIGH){
     digitalWrite(ledPin, LOW); 
     if(print){
     unsigned long CurrentTime = millis();
-    unsigned long ElapsedTime = CurrentTime - StartTime; 
+    ElapsedTime = CurrentTime - startTime; 
+    ogTime = ElapsedTime; 
+    Serial.print("OG TIME IS ");
+    Serial.println(ogTime); 
     print = false; 
-    Serial.print("Tap Time is ");
+    Serial.print("Elapsed Time is ");
     Serial.println(ElapsedTime);
 
+   
+    
+   
+    
+    
+    
+    //slow = true; 
+    Serial.print("Nonce is ");
+    Serial.println(randomNum);
+    ElapsedTime = ElapsedTime + randomNum; 
+    Serial.print("Elapsed Time with nonce is ");
+    Serial.println(ElapsedTime); 
     itoa(ElapsedTime, temp, 10); 
+    
 
 
-      Serial.println("Sending to nrf24_server");
-  // Send a message to nrf24_server
-  char storage[3]; 
-  ltoa(ElapsedTime,storage,10);
-   unsigned char a = storage[0]; 
-   unsigned char b = storage[1];  
-   unsigned char c = storage[2]; 
-   unsigned char d = storage[3]; 
-  uint8_t data[5] = {a, b, c, d};  
-  nrf24.send(data, sizeof(data));
+      //Serial.println("Sending to nrf24_server");
+
+
+    hasher.clear(); 
+    hasher.reset(); 
+    hasher.update(temp, 1); 
+    hasher.finalize(hash, 1);
+    Serial.print("Calculated Hash ");
+    Serial.print("");
+    for(int i = 0; i <1; i++){
+      Serial.println(hash[i]);
+      }
+      //Serial.println(" "); 
+
+
   
-  nrf24.waitPacketSent();
+    char b0[2]; 
+    ltoa(hash[0],b0,10);
+    unsigned char a =  b0[0]; 
+    unsigned char b = b0[1]; 
+    unsigned char c = b0[2]; 
+    uint8_t data[4] = {a, b, c}; 
+    
+    nrf24.send(data, sizeof(data));
+    nrf24.waitPacketSent();
+   
   // Now wait for a reply
-  uint8_t buf[RH_NRF24_MAX_MESSAGE_LEN];
-  uint8_t len = sizeof(buf);
+    uint8_t buf[RH_NRF24_MAX_MESSAGE_LEN];
+    uint8_t len = sizeof(buf);
 
-  if (nrf24.waitAvailableTimeout(500))
-  { 
+    if (nrf24.waitAvailableTimeout(500))
+    { 
     // Should be a reply message for us now   
-    if (nrf24.recv(buf, &len))
-    {
+      if (nrf24.recv(buf, &len))
+      {
       Serial.print("got reply: ");
       Serial.println((char*)buf);
+      Serial.println("");
+      enemyRandom = (char*)buf; 
+      
+      End++; 
+      //Serial.print("End is ");
+      //Serial.println(End);
+    if(End == 2){
+        Serial.print("REACHED END");
+        Serial.print("My Original duration is "); 
+        Serial.println(ogTime);
+        Serial.print("Enemy nonce is "); 
+        Serial.println(enemyRandom);
+        ogTime = ogTime + enemyRandom.toInt(); 
+        Serial.print("Calculated Elapsed Time is "); 
+        Serial.println(ogTime); 
+        itoa(ogTime, temp, 10);
+        hasher.clear(); 
+        hasher.reset(); 
+        hasher.update(temp, 1); 
+        hasher.finalize(hash, 1);
+        Serial.print("Calculated enemy Hash ");
+        Serial.print("");
+          //String computedHash1 = String(hash[0] + hash[1] + hash[2]+ hash[3]); 
+          String computedHash1 = String(hash[0]);
+        Serial.print(computedHash1);
+        Serial.print("enemy hash is ");
+        Serial.println(enemyHash);
+        if(enemyHash.equals(computedHash1)){
+          Serial.print("AUTHENTICATION PASS"); 
+          }
+        else{
+          Serial.print("AUTHENTICATION FAIL"); 
+          }
+        }
+
+      }
+      else
+      {
+      Serial.println("recv failed");
+      }
     }
     else
     {
-      Serial.println("recv failed");
-    }
-  }
-  else
-  {
     Serial.println("No reply, is nrf24_server running?");
-  }
+    }
   //delay(400);
     
     }
-    StartTime = 0; 
+    startTime = 0; 
     
     
     

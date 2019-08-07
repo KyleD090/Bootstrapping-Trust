@@ -8,50 +8,68 @@
 #include <string.h>
 
 RH_NRF24 nrf24;
-int ledPin = 4;                
-int buttonPin = 2; 
-String message; 
-unsigned long startTime = 0;  
-boolean print = false; 
-char temp[4]; 
-char response[4];
-byte hash[1];
-SHA256 hasher = SHA256(); 
-//long randomNum; 
-unsigned long ElapsedTime = 0000;
-//boolean slow = true; 
-int End = 0; 
-String enemyRandom; 
-String enemyHash; 
-unsigned long ogTime = 0000;  
-long randomNum = random(100, 3000);
+int mLedPin = 4;                
+int mButtonPin = 2; 
+String mMessage; 
+unsigned long mStartTime = 0;  
+boolean mPrint = false; 
+char mTemp[4]; 
+char mResponse[4];
+byte mHash[1];
+SHA256 mHasher = SHA256(); 
+unsigned long mElapsedTime = 0000;
+int mEnd = 0; 
+String mEnemyRandom; 
+String mEnemyHash; 
+unsigned long mOriginalTime = 0000;  
+long mRandomNum = random(100, 3000);
+int mStartCapture = 0;
+unsigned long mCaptureTime = 0000;
+unsigned long mUpdateTime = 0000;
+unsigned long mOriginalDurations[20];
+unsigned long mFinalVector[10];
+int mArrayCounter = 0; 
+unsigned long mBins[10];
+boolean mStop = true;
+int mRespond = 0;  
+String mUnknownNonce;  
+String mUnknownHash[14]; 
 
 void setup() 
 {
   
   Serial.begin(9600);
   Serial.println("I'm D1");
-  while (!Serial) 
-    ; // wait for serial port to connect. Needed for Leonardo only
+  while (!Serial); 
   if (!nrf24.init())
     Serial.println("init failed");
-  // Defaults after init are 2.402 GHz (channel 2), 2Mbps, 0dBm
   if (!nrf24.setChannel(1))
     Serial.println("setChannel failed");
   if (!nrf24.setRF(RH_NRF24::DataRate2Mbps, RH_NRF24::TransmitPower0dBm))
     Serial.println("setRF failed");    
 
 
-  pinMode(ledPin, OUTPUT);
-  pinMode(buttonPin, INPUT);
+  pinMode(mLedPin, OUTPUT);
+  pinMode(mButtonPin, INPUT);
 
   randomSeed(2);
-  randomNum = random(100, 3000);
+  mRandomNum = random(100, 3000);
   Serial.print("Intial nonce is " );
-  Serial.println(randomNum);
+  Serial.println(mRandomNum);
+  
+  //String result = sha1("test string");
 
-
-
+  
+  mBins[0] = 500;
+  mBins[1] = 1000;
+  mBins[2] = 1500;
+  mBins[3] = 2000;
+  mBins[4] = 2500;
+  mBins[5] = 3000;
+  mBins[6] = 3500;
+  mBins[7] = 4000;
+  mBins[8] = 4500;
+  mBins[9] = 5000;
 
   
 }
@@ -59,64 +77,62 @@ void setup()
 
 void loop()
 {
+ 
   
-    // Look for  message    
+    // Listen for  Message    
+
     if (nrf24.available())
   {
     uint8_t buf[RH_NRF24_MAX_MESSAGE_LEN];
     uint8_t len = sizeof(buf);
     if (nrf24.recv(buf, &len))
     {
-//      NRF24::printBuffer("request: ", buf, len);
       Serial.print("got request: ");
       Serial.println((char*)buf);
-      enemyHash = (char*)buf; 
-      // Send a reply
-      //Serial.print("Elapsed Time is ");
-      //Serial.println(ElapsedTime);
-      itoa(randomNum, response, 10); 
-      unsigned char t1 = response[0]; 
-      unsigned char t2 = response[1]; 
-      unsigned char t3 = response[2]; 
-      unsigned char t4 = response[3]; 
-      uint8_t data[5] = {t1, t2, t3, t4};
-      nrf24.send(data, sizeof(data));
-      nrf24.waitPacketSent();
-      Serial.println("Sent a reply");
-      Serial.println("");
-      End++; 
-      //Serial.print("End is ");
-      //Serial.println(End);
-      if(End == 2){
-        Serial.print("REACHED END");
-        Serial.print("My Original duration is "); 
-        Serial.println(ogTime);
-        Serial.print("Enemy nonce is "); 
-        Serial.println(enemyRandom);
-        ogTime = ogTime + enemyRandom.toInt();
-        Serial.print("Calculated Elapsed Time is "); 
-        Serial.println(ogTime); 
-        itoa(ogTime, temp, 10);
-        hasher.clear(); 
-        hasher.reset(); 
-        hasher.update(temp, 1); 
-        hasher.finalize(hash, 1);
-        Serial.print("Calculated enemy Hash ");
-        Serial.print("");
-          //String computedHash1 = String(hash[0] + hash[1] + hash[2]+ hash[3]); 
-          String computedHash1 = String(hash[0]);
-          Serial.print(computedHash1);
-        Serial.println("enemy hash is ");
-        Serial.print(enemyHash);
-        if(enemyHash.equals(computedHash1)){
-          Serial.print("AUTHENTICATION PASS"); 
-          }
-        else{
-          Serial.print("AUTHENTICATION FAIL"); 
-          }
+      if(mRespond <= 13){
+        mUnknownHash[mRespond] = (char*)buf; 
+      }
+      
+      
+      if(mRespond == 13 ){
+        delay(500);
+        sendNonce(); 
         }
-      //slow = false; 
+        if(mRespond == 14 ){
+          mUnknownNonce = (char*)buf;  
+          //Serial.print("FINISH");
+        finishProtocol();
+        }
+        Serial.print(mRespond);
+        mRespond++; 
+      
+      /*
+      mEnemyHash = (char*)buf; 
+      Serial.print("");  
+         
+      //Send nonce back 
+      
+      itoa(mRandomNum, mResponse, 10); 
+      Serial.print(""); 
+      unsigned char t1 = mResponse[0]; 
+      unsigned char t2 = mResponse[1]; 
+      unsigned char t3 = mResponse[2]; 
+      unsigned char t4 = mResponse[3]; 
+      uint8_t data[5] = {t1, t2, t3, t4};
+      Serial.print("");
+      //nrf24.send(data, sizeof(data));
+      //nrf24.waitPacketSent();
+     // Serial.println("Sent a reply");
+      Serial.println("");
+
+      
+      mEnd++; 
+     // if(mEnd == 2){
+       // finishProtocol(); 
+       // }
+        */
     }
+   
     else
     {
       Serial.println("recv failed");
@@ -126,116 +142,200 @@ void loop()
 
 
   
- //This code is triggered if a button is pressed 
-  if(digitalRead(buttonPin) == HIGH){
+ //When the button is pressed 
+
+  if(mStartCapture == 1){
+    mCaptureTime = millis(); 
+    }
+  else{
+    if(mStartCapture > 1){
+      mUpdateTime = millis();  
+      if((mUpdateTime - mCaptureTime) >= 20000){
+      
+        if(mStop){
+          Serial.println("STOP PRESSING");
+        if(mArrayCounter < 20){
+          for(int i = mArrayCounter; i < 20; i++){
+            mOriginalDurations[i] = 0; 
+            }
+          }
+        calculateVector(); 
+        Serial.print("Vector is ");
+        for(int i = 0; i < 10; i++){
+          Serial.print(i);
+          Serial.println(mFinalVector[i]);
+          }
+         delay(500);
+        sendVector();
+        mStop = false;
+          }
+        }
+        else{
+          Serial.print("Elapsed Time is"); 
+          Serial.println(mUpdateTime - mCaptureTime);
+          }
+    }
+    }
   
-    digitalWrite(ledPin, HIGH);
-    print = true; 
-    if(startTime == 0){
-    startTime = millis();
+  if(digitalRead(mButtonPin) == HIGH){
+    mStartCapture++; 
+    digitalWrite(mLedPin, HIGH);
+    mPrint = true; 
+    if(mStartTime == 0){
+    mStartTime = millis();
     }
   }
   else{
+
+    //calculate elapsed time 
     
-    digitalWrite(ledPin, LOW); 
-    if(print){
+    digitalWrite(mLedPin, LOW); 
+    if(mPrint){
     unsigned long CurrentTime = millis();
-    ElapsedTime = CurrentTime - startTime; 
-    ogTime = ElapsedTime; 
-    Serial.print("OG TIME IS ");
-    Serial.println(ogTime); 
-    print = false; 
+    mElapsedTime = CurrentTime - mStartTime; 
+    mOriginalTime = mElapsedTime; 
+    Serial.print("Original Elapsed Time is ");
+    Serial.println(mOriginalTime); 
+    mPrint = false; 
     Serial.print("Elapsed Time is ");
-    Serial.println(ElapsedTime);
-
-   
+    Serial.println(mElapsedTime);
+    mElapsedTime = roundDown(mElapsedTime); 
+    Serial.print("Rounded time is ");
+    Serial.println(mElapsedTime);
+    mOriginalDurations[mArrayCounter] = mElapsedTime; 
+    mArrayCounter++; 
     
    
+       
     
+  
     
+    }
+    mStartTime = 0; 
+  }
+}
+
+void finishProtocol(){
+  Serial.println("REACHED END");
+  Serial.println("Unknown Hash is ");
+  for(int i = 0; i < 14; i++){
+    Serial.print(i);
+    Serial.println(mUnknownHash[i]);
+    }
+
     
-    //slow = true; 
-    Serial.print("Nonce is ");
-    Serial.println(randomNum);
-    ElapsedTime = ElapsedTime + randomNum; 
-    Serial.print("Elapsed Time with nonce is ");
-    Serial.println(ElapsedTime); 
-    itoa(ElapsedTime, temp, 10); 
-    
+   mUnknownNonce.remove(2, 4);
+   Serial.println("Unknown Nonce is ");
+   Serial.print(mUnknownNonce);
 
+  /*
+Serial.println("REACHED END");
+Serial.print("My Original duration is "); 
+Serial.println(mOriginalTime);
+Serial.print("Enemy nonce is "); 
+Serial.println(mEnemyRandom);
+mOriginalTime = mOriginalTime + mEnemyRandom.toInt();
+Serial.print("Calculated Elapsed Time is "); 
+Serial.println(mOriginalTime); 
+itoa(mOriginalTime, mTemp, 10);
+mHasher.clear(); 
+mHasher.reset(); 
+mHasher.update(mTemp, 1); 
+mHasher.finalize(mHash, 1);
+Serial.print("Calculated enemy Hash ");
+Serial.print("");  
+String computedmHash1 = String(mHash[0]);
+Serial.println(computedmHash1);
+Serial.print("enemy Hash is ");
+Serial.println(mEnemyHash);
+if(mEnemyHash.equals(computedmHash1)){
+  Serial.print("AUTHENTICATION PASS"); 
+}
+else{
+ Serial.print("AUTHENTICATION FAIL"); 
+}
+*/
+}
 
-      //Serial.println("Sending to nrf24_server");
+unsigned long roundDown(unsigned long X){
+  if(X > 0 && X<1000){return 500;}
+  if(X >=1000  && X<1500){return 1000;}
+  if(X >= 1500 && X<2000){return 1500;}
+  if(X >= 2000 && X<2500){return 2000;}
+  if(X >= 2500 && X<3000){return 2500;}
+  if(X >= 3000 && X<3500){return 3000;}
+  if(X >= 3500 && X<4000){return 3500;}
+  if(X >= 4000 && X<4500){return 4000;}
+  if(X >= 4500 && X<5000){return 4500;}
+  if(X >= 5000){return 5000;}
+  else{return 0;}
+  }
 
+void calculateVector(){
+  unsigned long vBin; 
+  for(int i = 0; i < 10; i++){
+    vBin = mBins[i];
+    unsigned long vCounter = 0;
+    for(int j = 0; j < 20; j++){
+      if(vBin == mOriginalDurations[j]){
+        vCounter++;
+        }
+      }
+      mFinalVector[i] = vCounter; 
+    }
+  }
 
-    hasher.clear(); 
-    hasher.reset(); 
-    hasher.update(temp, 1); 
-    hasher.finalize(hash, 1);
+void sendVector(){
+     //calculate hash
+     String vVectorString = "";  
+     for(int i = 0; i < 10; i++){
+      vVectorString = vVectorString + String(mFinalVector[i]);
+      } 
+    vVectorString = vVectorString + String(mRandomNum);
+    char vTemp[vVectorString.length()];
+    vVectorString.toCharArray(vTemp, vVectorString.length() );
+    //itoa(mElapsedTime, mTemp, 10);
+    mHasher.clear(); 
+    mHasher.reset(); 
+    mHasher.update(vTemp, vVectorString.length()); 
+    mHasher.finalize(mHash, vVectorString.length());
     Serial.print("Calculated Hash ");
     Serial.print("");
-    for(int i = 0; i <1; i++){
-      Serial.println(hash[i]);
+    for(int i = 0; i < vVectorString.length(); i++){
+      Serial.print(i);
+      Serial.println(mHash[i]);
       }
-      //Serial.println(" "); 
-
-
   
-    char b0[2]; 
-    ltoa(hash[0],b0,10);
-    unsigned char a =  b0[0]; 
-    unsigned char b = b0[1]; 
-    unsigned char c = b0[2]; 
+
+
+
+    //send hash 
+
+    for(int i = 0; i < vVectorString.length(); i++ ){
+    char vSender[2]; 
+    ltoa(mHash[i],vSender,10);
+    unsigned char a =  vSender[0]; 
+    unsigned char b = vSender[1]; 
+    unsigned char c = vSender[2]; 
     uint8_t data[4] = {a, b, c}; 
-    
     nrf24.send(data, sizeof(data));
     nrf24.waitPacketSent();
    
-  // Now wait for a reply
+
+    //get a response 
+    
     uint8_t buf[RH_NRF24_MAX_MESSAGE_LEN];
     uint8_t len = sizeof(buf);
-
     if (nrf24.waitAvailableTimeout(500))
-    { 
-    // Should be a reply message for us now   
+    {   
       if (nrf24.recv(buf, &len))
       {
       Serial.print("got reply: ");
       Serial.println((char*)buf);
       Serial.println("");
-      enemyRandom = (char*)buf; 
+      mEnemyRandom = (char*)buf; 
       
-      End++; 
-      //Serial.print("End is ");
-      //Serial.println(End);
-    if(End == 2){
-        Serial.print("REACHED END");
-        Serial.print("My Original duration is "); 
-        Serial.println(ogTime);
-        Serial.print("Enemy nonce is "); 
-        Serial.println(enemyRandom);
-        ogTime = ogTime + enemyRandom.toInt(); 
-        Serial.print("Calculated Elapsed Time is "); 
-        Serial.println(ogTime); 
-        itoa(ogTime, temp, 10);
-        hasher.clear(); 
-        hasher.reset(); 
-        hasher.update(temp, 1); 
-        hasher.finalize(hash, 1);
-        Serial.print("Calculated enemy Hash ");
-        Serial.print("");
-          //String computedHash1 = String(hash[0] + hash[1] + hash[2]+ hash[3]); 
-          String computedHash1 = String(hash[0]);
-        Serial.print(computedHash1);
-        Serial.print("enemy hash is ");
-        Serial.println(enemyHash);
-        if(enemyHash.equals(computedHash1)){
-          Serial.print("AUTHENTICATION PASS"); 
-          }
-        else{
-          Serial.print("AUTHENTICATION FAIL"); 
-          }
-        }
-
+     
       }
       else
       {
@@ -244,28 +344,48 @@ void loop()
     }
     else
     {
-    Serial.println("No reply, is nrf24_server running?");
+    //Serial.println("No reply, is nrf24_server running?");
     }
-  //delay(400);
-    
     }
-    startTime = 0; 
-    
-    
-    
   }
 
+  void sendNonce(){
+   Serial.print("SENDING NONCE");
+    char vSender[4]; 
+    
+    ltoa(mRandomNum,vSender,10);
+    unsigned char a =  vSender[0]; 
+    unsigned char b = vSender[1]; 
+    unsigned char c = vSender[2]; 
+    unsigned char d = vSender[3]; 
+    uint8_t data[5] = {a, b, c, d}; 
+    nrf24.send(data, sizeof(data));
+    nrf24.waitPacketSent();
 
 
-
-
-
-
-
-
-
-
-
-  
-
-}
+    //get a response 
+    
+    uint8_t buf[RH_NRF24_MAX_MESSAGE_LEN];
+    uint8_t len = sizeof(buf);
+    if (nrf24.waitAvailableTimeout(500))
+    {   
+      if (nrf24.recv(buf, &len))
+      {
+      Serial.print("got reply: ");
+      Serial.println((char*)buf);
+      Serial.println("");
+      //mEnemyRandom = (char*)buf; 
+      
+     
+      }
+      else
+      {
+      Serial.println("recv failed");
+      }
+    }
+    else
+    {
+    //Serial.println("No reply, is nrf24_server running?");
+    }
+    
+    }

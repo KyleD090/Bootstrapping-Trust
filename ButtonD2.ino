@@ -14,6 +14,7 @@ boolean mPrint = false;
 char mTemp[4]; 
 char mResponse[4];
 byte mHash[1];
+byte mHash2[1];
 SHA256 mHasher = SHA256(); 
 unsigned long mElapsedTime = 0000;
 int mEnd = 0; 
@@ -31,7 +32,7 @@ unsigned long mBins[10];
 boolean mStop = true;  
 int mRespond = 0; 
 String mUnknownHash[14]; 
-String mUnknownNonce; 
+String mUnknownNonce[1]; 
 void setup() 
 {
   
@@ -97,9 +98,9 @@ void loop()
         }
       
         if(mRespond == 14 ){
-          Serial.println("TEST");
-          Serial.print((char*)buf);
-         mUnknownNonce = (char*)buf;
+          //Serial.println("TEST");
+          //Serial.print((char*)buf);
+          mUnknownNonce[0] = (char*)buf;
         
         delay(1000);
         sendNonce(); 
@@ -219,15 +220,47 @@ void loop()
 void finishProtocol(){
   Serial.println("REACHED END");
   Serial.println("Unknown Hash is ");
+  String vUnknownHash = ""; 
   for(int i = 0; i < 14; i++){
     Serial.print(i);
     Serial.println(mUnknownHash[i]);
+    vUnknownHash = vUnknownHash + mUnknownHash[i]; 
     }
 
 
-    mUnknownNonce.remove(2, 4); 
+    //mUnknownNonce[0].remove(2, 4); 
    Serial.println("Unknown Nonce is ");
    Serial.print(mUnknownNonce[0]);
+
+
+   String vCalc = ""; 
+  for(int i = 0; i < 14; i++){
+    vCalc = vCalc + mHash[i]; 
+    }
+    vCalc = vCalc + mUnknownNonce[0]; 
+
+    char vTemp[vCalc.length()];
+    vCalc.toCharArray(vTemp, vCalc.length() );
+    //itoa(mElapsedTime, mTemp, 10);
+    mHasher.clear(); 
+    mHasher.reset(); 
+    mHasher.update(vTemp, vCalc.length()); 
+    mHasher.finalize(mHash2, vCalc.length());
+
+    String vCalculatedHash = ""; 
+    Serial.println("Calculated hash is " );
+    for(int i = 0; i < 14; i++){
+    Serial.print(i);
+    Serial.println(mHash2[i]);
+    vCalculatedHash = vCalculatedHash + mHash2[i]; 
+    }
+
+    if(vCalculatedHash.equals(vUnknownHash)){
+      Serial.println("PAIRING SUCCESS");
+      }
+    else{
+      Serial.println("PAIRING FAILURE");
+      }
 }
 
 
@@ -295,7 +328,8 @@ void sendVector(){
     nrf24.send(data, sizeof(data));
     nrf24.waitPacketSent();
    
-
+    String x = String(mHash[i]);
+    
     //get a response 
     
     uint8_t buf[RH_NRF24_MAX_MESSAGE_LEN];
@@ -329,7 +363,8 @@ void sendVector(){
 
 
    void sendNonce(){
-   
+
+   Serial.println("SENDING NONCE");
     char vSender[4]; 
     //Serial.print("TEST my nonce is "); 
     //Serial.println(mRandomNum);

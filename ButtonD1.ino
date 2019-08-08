@@ -16,6 +16,7 @@ boolean mPrint = false;
 char mTemp[4]; 
 char mResponse[4];
 byte mHash[1];
+byte mHash2[1];
 SHA256 mHasher = SHA256(); 
 unsigned long mElapsedTime = 0000;
 int mEnd = 0; 
@@ -32,7 +33,7 @@ int mArrayCounter = 0;
 unsigned long mBins[10];
 boolean mStop = true;
 int mRespond = 0;  
-String mUnknownNonce;  
+String mUnknownNonce[1];  
 String mUnknownHash[14]; 
 
 void setup() 
@@ -99,7 +100,7 @@ void loop()
         sendNonce(); 
         }
         if(mRespond == 14 ){
-          mUnknownNonce = (char*)buf;  
+          mUnknownNonce[0] = (char*)buf;  
           //Serial.print("FINISH");
         finishProtocol();
         }
@@ -218,43 +219,45 @@ void loop()
 void finishProtocol(){
   Serial.println("REACHED END");
   Serial.println("Unknown Hash is ");
+  String vUnknownHash = ""; 
   for(int i = 0; i < 14; i++){
     Serial.print(i);
     Serial.println(mUnknownHash[i]);
+    vUnknownHash = vUnknownHash + mUnknownHash[i]; 
     }
 
-    
-   mUnknownNonce.remove(2, 4);
+    //mUnknownNonce[0].remove(2, 4); 
    Serial.println("Unknown Nonce is ");
-   Serial.print(mUnknownNonce);
+   Serial.print(mUnknownNonce[0]);
 
-  /*
-Serial.println("REACHED END");
-Serial.print("My Original duration is "); 
-Serial.println(mOriginalTime);
-Serial.print("Enemy nonce is "); 
-Serial.println(mEnemyRandom);
-mOriginalTime = mOriginalTime + mEnemyRandom.toInt();
-Serial.print("Calculated Elapsed Time is "); 
-Serial.println(mOriginalTime); 
-itoa(mOriginalTime, mTemp, 10);
-mHasher.clear(); 
-mHasher.reset(); 
-mHasher.update(mTemp, 1); 
-mHasher.finalize(mHash, 1);
-Serial.print("Calculated enemy Hash ");
-Serial.print("");  
-String computedmHash1 = String(mHash[0]);
-Serial.println(computedmHash1);
-Serial.print("enemy Hash is ");
-Serial.println(mEnemyHash);
-if(mEnemyHash.equals(computedmHash1)){
-  Serial.print("AUTHENTICATION PASS"); 
-}
-else{
- Serial.print("AUTHENTICATION FAIL"); 
-}
-*/
+  String vCalc = ""; 
+  for(int i = 0; i < 14; i++){
+    vCalc = vCalc + mHash[i]; 
+    }
+    vCalc = vCalc + mUnknownNonce[0]; 
+
+    char vTemp[vCalc.length()];
+    vCalc.toCharArray(vTemp, vCalc.length() );
+    //itoa(mElapsedTime, mTemp, 10);
+    mHasher.clear(); 
+    mHasher.reset(); 
+    mHasher.update(vTemp, vCalc.length()); 
+    mHasher.finalize(mHash2, vCalc.length());
+
+    String vCalculatedHash = ""; 
+    Serial.println("Calculated hash is ");
+    for(int i = 0; i < 14; i++){
+    Serial.print(i);
+    Serial.println(mHash2[i]);
+    vCalculatedHash = vCalculatedHash + mHash2[i]; 
+    }
+
+    if(vCalculatedHash.equals(vUnknownHash)){
+      Serial.println("PAIRING SUCCESS");
+      }
+    else{
+      Serial.println("PAIRING FAILURE");
+      }
 }
 
 unsigned long roundDown(unsigned long X){
@@ -350,7 +353,7 @@ void sendVector(){
   }
 
   void sendNonce(){
-   Serial.print("SENDING NONCE");
+   Serial.println("SENDING NONCE");
     char vSender[4]; 
     
     ltoa(mRandomNum,vSender,10);

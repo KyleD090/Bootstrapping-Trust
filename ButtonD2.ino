@@ -13,8 +13,8 @@ unsigned long mStartTime = 0;
 boolean mPrint = false; 
 char mTemp[4]; 
 char mResponse[4];
-byte mHash[1];
-byte mHash2[1];
+byte mHash[14];
+byte mHash2[14];
 SHA256 mHasher = SHA256(); 
 unsigned long mElapsedTime = 0000;
 int mEnd = 0; 
@@ -58,6 +58,7 @@ void setup()
   //String result = sha1("test string");
 
   
+      
   mBins[0] = 500;
   mBins[1] = 1000;
   mBins[2] = 1500;
@@ -102,12 +103,12 @@ void loop()
           //Serial.print((char*)buf);
           mUnknownNonce[0] = (char*)buf;
         
-        delay(1000);
+        delay(1200);
         sendNonce(); 
         //Serial.print("FINISH");
         finishProtocol(); 
         }
-        Serial.print(mRespond);
+        //Serial.print(mRespond);
         mRespond++; 
     
       /*
@@ -234,11 +235,13 @@ void finishProtocol(){
 
 
    String vCalc = ""; 
-  for(int i = 0; i < 14; i++){
-    vCalc = vCalc + mHash[i]; 
+  for(int i = 0; i < 10; i++){
+    vCalc = vCalc + String(mFinalVector[i]); 
     }
     vCalc = vCalc + mUnknownNonce[0]; 
-
+    Serial.print("h4 input is ");
+    Serial.println(vCalc);
+    
     char vTemp[vCalc.length()];
     vCalc.toCharArray(vTemp, vCalc.length() );
     //itoa(mElapsedTime, mTemp, 10);
@@ -299,6 +302,8 @@ void sendVector(){
       vVectorString = vVectorString + String(mFinalVector[i]);
       } 
     vVectorString = vVectorString + String(mRandomNum);
+    Serial.print("h2 input is ");
+    Serial.println(vVectorString);
     char vTemp[vVectorString.length()];
     vVectorString.toCharArray(vTemp, vVectorString.length() );
     //itoa(mElapsedTime, mTemp, 10);
@@ -379,6 +384,7 @@ void sendVector(){
    
 
     //get a response 
+    /*
     
     uint8_t buf[RH_NRF24_MAX_MESSAGE_LEN];
     uint8_t len = sizeof(buf);
@@ -402,5 +408,5 @@ void sendVector(){
     {
     //Serial.println("No reply, is nrf24_server running?");
     }
-    
+    */
     }
